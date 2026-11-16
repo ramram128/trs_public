@@ -13,6 +13,7 @@ from app.models.contact import ContactInquiry
 from app.models.newsletter import NewsletterSubscriber
 from app.models.banner import HomepageBanner
 from app.models.notification import Notification
+from app.models.uploaded_file import UploadedFile
 
 __all__ = [
     "User", "UserRole",
@@ -23,5 +24,5 @@ __all__ = [
     "Payment", "PaymentGateway",
     "Setting", "AdminActivityLog",
     "Coupon", "Review", "Address", "ContactInquiry", "NewsletterSubscriber", "HomepageBanner",
-    "Notification",
+    "Notification", "UploadedFile",
 ]

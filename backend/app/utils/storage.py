@@ -3,6 +3,7 @@ from botocore.exceptions import ClientError
 from fastapi import UploadFile, HTTPException
 import uuid
 import os
+import logging
 from app.config import settings
 
 # Allowed image types
@@ -83,8 +84,8 @@ def delete_image_from_s3(image_url: str) -> bool:
 LOCAL_UPLOAD_DIR = "uploads"
 
 
-async def upload_image_local(file: UploadFile, folder: str = "products") -> str:
-    """Upload image to local storage (development fallback)"""
+async def upload_image_db(file: UploadFile, folder: str = "products") -> str:
+    """Upload image directly into TiDB database (permanent, card-free cloud storage)"""
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="Invalid file type")
 
@@ -92,13 +93,39 @@ async def upload_image_local(file: UploadFile, folder: str = "products") -> str:
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="File too large. Max 5MB")
 
-    os.makedirs(f"{LOCAL_UPLOAD_DIR}/{folder}", exist_ok=True)
     ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "jpg"
-    filename = f"{uuid.uuid4().hex}.{ext}"
-    filepath = f"{LOCAL_UPLOAD_DIR}/{folder}/{filename}"
+    file_id = uuid.uuid4().hex
+    stored_filename = f"{file_id}.{ext}"
 
-    with open(filepath, "wb") as f:
-        f.write(contents)
+    # Store in TiDB database
+    try:
+        from app.database import SessionLocal
+        from app.models.uploaded_file import UploadedFile
+
+        db = SessionLocal()
+        try:
+            record = UploadedFile(
+                id=file_id,
+                filename=stored_filename,
+                content_type=file.content_type,
+                size=len(contents),
+                data=contents,
+            )
+            db.add(record)
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        logger_storage = logging.getLogger(__name__)
+        logger_storage.error(f"Error saving image to DB: {e}")
+
+    # Also cache locally on disk if possible
+    try:
+        os.makedirs(f"{LOCAL_UPLOAD_DIR}/{folder}", exist_ok=True)
+        with open(f"{LOCAL_UPLOAD_DIR}/{folder}/{stored_filename}", "wb") as f:
+            f.write(contents)
+    except Exception:
+        pass
 
     api_url = os.getenv("RENDER_EXTERNAL_URL")
     if not api_url:
@@ -109,11 +136,11 @@ async def upload_image_local(file: UploadFile, folder: str = "products") -> str:
         else:
             api_url = settings.API_URL or "http://localhost:8000"
 
-    return f"{api_url}/uploads/{folder}/{filename}"
+    return f"{api_url}/api/uploads/{stored_filename}"
 
 
 async def upload_image(file: UploadFile, folder: str = "products") -> str:
-    """Upload image - uses S3 if configured, else local storage"""
+    """Upload image - uses S3 if configured, else TiDB database storage"""
     aws_key = settings.AWS_ACCESS_KEY_ID
     aws_secret = settings.AWS_SECRET_ACCESS_KEY
     if (
@@ -123,4 +150,4 @@ async def upload_image(file: UploadFile, folder: str = "products") -> str:
         and not aws_secret.startswith("your-")
     ):
         return await upload_image_to_s3(file, folder)
-    return await upload_image_local(file, folder)
+    return await upload_image_db(file, folder)

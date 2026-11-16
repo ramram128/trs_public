@@ -65,8 +65,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static file serving for local uploads
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Serve uploaded files from TiDB database with local fallback
+@app.get("/api/uploads/{file_name:path}")
+@app.get("/uploads/{file_name:path}")
+async def serve_uploaded_file(file_name: str):
+    from app.database import SessionLocal
+    from app.models.uploaded_file import UploadedFile
+    from fastapi.responses import Response, FileResponse
+    from fastapi import HTTPException
+    import os
+
+    clean_name = file_name.replace("\\", "/").split("/")[-1]
+    file_id = clean_name.rsplit(".", 1)[0] if "." in clean_name else clean_name
+
+    db = SessionLocal()
+    try:
+        record = db.query(UploadedFile).filter(
+            (UploadedFile.id == file_id) | (UploadedFile.filename == clean_name)
+        ).first()
+        if record:
+            return Response(
+                content=record.data,
+                media_type=record.content_type,
+                headers={
+                    "Cache-Control": "public, max-age=31536000, immutable",
+                    "Content-Disposition": f'inline; filename="{record.filename}"',
+                },
+            )
+    finally:
+        db.close()
+
+    for base_dir in ["uploads", "uploads/products", "uploads/categories", "uploads/slips"]:
+        candidate = os.path.join(base_dir, clean_name)
+        if os.path.exists(candidate) and os.path.isfile(candidate):
+            return FileResponse(candidate)
+
+    raise HTTPException(status_code=404, detail="Image not found")
 
 # Create DB tables & ensure schema migration
 @app.on_event("startup")
