@@ -93,7 +93,15 @@ async def upload_image_local(file: UploadFile, folder: str = "products") -> str:
     with open(filepath, "wb") as f:
         f.write(contents)
 
-    api_url = settings.API_URL or "http://localhost:8000"
+    api_url = os.getenv("RENDER_EXTERNAL_URL")
+    if not api_url:
+        if settings.API_URL and not settings.API_URL.startswith("http://localhost"):
+            api_url = settings.API_URL
+        elif settings.ENVIRONMENT == "production":
+            api_url = "https://trs-backend-asmu.onrender.com"
+        else:
+            api_url = settings.API_URL or "http://localhost:8000"
+
     return f"{api_url}/uploads/{folder}/{filename}"
 
 
