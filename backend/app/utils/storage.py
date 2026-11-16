@@ -11,19 +11,21 @@ MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
 
 def get_s3_client():
-    return boto3.client(
-        "s3",
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name=settings.AWS_REGION,
-    )
+    kwargs = {
+        "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+        "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+        "region_name": settings.AWS_REGION or "auto",
+    }
+    if settings.AWS_ENDPOINT_URL:
+        kwargs["endpoint_url"] = settings.AWS_ENDPOINT_URL
+    return boto3.client("s3", **kwargs)
 
 
 async def upload_image_to_s3(
     file: UploadFile,
     folder: str = "products",
 ) -> str:
-    """Upload image file to AWS S3 and return URL"""
+    """Upload image file to AWS S3 / Cloudflare R2 and return URL"""
     # Validate content type
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(
@@ -49,9 +51,14 @@ async def upload_image_to_s3(
             Key=filename,
             Body=contents,
             ContentType=file.content_type,
-         
         )
-        url = f"https://{settings.AWS_S3_BUCKET}.s3.{settings.AWS_REGION}.amazonaws.com/{filename}"
+        if settings.AWS_S3_CUSTOM_DOMAIN:
+            domain = settings.AWS_S3_CUSTOM_DOMAIN.rstrip("/")
+            if not domain.startswith("http://") and not domain.startswith("https://"):
+                domain = f"https://{domain}"
+            url = f"{domain}/{filename}"
+        else:
+            url = f"https://{settings.AWS_S3_BUCKET}.s3.{settings.AWS_REGION}.amazonaws.com/{filename}"
         return url
     except ClientError as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")

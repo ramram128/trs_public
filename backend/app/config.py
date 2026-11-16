@@ -12,11 +12,13 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # AWS S3
+    # AWS S3 / Cloudflare R2
     AWS_ACCESS_KEY_ID: Optional[str] = None
     AWS_SECRET_ACCESS_KEY: Optional[str] = None
-    AWS_REGION: str = "ap-south-1"
+    AWS_REGION: str = "auto"
     AWS_S3_BUCKET: str = "trs-imports-media"
+    AWS_ENDPOINT_URL: Optional[str] = None  # for Cloudflare R2: https://<account_id>.r2.cloudflarestorage.com
+    AWS_S3_CUSTOM_DOMAIN: Optional[str] = None  # for R2 public URL: e.g. pub-xxxx.r2.dev or cdn.yourdomain.com
 
     # Email Configuration (SMTP: Gmail, Outlook, or Custom SMTP)
     SMTP_HOST: Optional[str] = None
