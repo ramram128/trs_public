@@ -8,6 +8,11 @@ logger = logging.getLogger(__name__)
 
 db_url = settings.DATABASE_URL
 
+# Auto-enable SSL for TiDB Cloud if omitted
+if db_url.startswith("mysql") and "tidbcloud.com" in db_url and "ssl" not in db_url:
+    delimiter = "&" if "?" in db_url else "?"
+    db_url = f"{db_url}{delimiter}ssl_verify_cert=true&ssl_verify_identity=true"
+
 if db_url.startswith("mysql"):
     try:
         test_engine = create_engine(db_url, pool_pre_ping=True)
