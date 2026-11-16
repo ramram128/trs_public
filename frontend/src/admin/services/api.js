@@ -1,7 +1,7 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
 const adminApi = axios.create({
   baseURL: `${API_URL}/admin`,
@@ -51,8 +51,8 @@ export const adminService = {
   getSalesReport: (params) => adminApi.get('/reports/sales', { params }),
 
   // Products
-  getProducts: (params) => axios.get(`${API_URL}/products`, { params }), // Public endpoint with admin auth
-  getProduct: (id) => axios.get(`${API_URL}/products/by-id/${id}`),
+  getProducts: (params) => adminApi.get('/products', { params, baseURL: API_URL }), // Public endpoint with admin auth
+  getProduct: (id) => adminApi.get(`/products/by-id/${id}`, { baseURL: API_URL }),
   createProduct: (data) => adminApi.post('/products', data, { baseURL: API_URL }),
   updateProduct: (id, data) => adminApi.put(`/products/${id}`, data, { baseURL: API_URL }),
   deleteProduct: (id) => adminApi.delete(`/products/${id}`, { baseURL: API_URL }),
@@ -67,7 +67,7 @@ export const adminService = {
   deleteProductImage: (productId, imageId) => adminApi.delete(`/products/${productId}/images/${imageId}`, { baseURL: API_URL }),
 
   // Categories
-  getCategories: (params) => axios.get(`${API_URL}/categories`, { params }),
+  getCategories: (params) => adminApi.get('/categories', { params, baseURL: API_URL }),
   createCategory: (data) => adminApi.post('/categories', data, { baseURL: API_URL }),
   updateCategory: (id, data) => adminApi.put(`/categories/${id}`, data, { baseURL: API_URL }),
   deleteCategory: (id) => adminApi.delete(`/categories/${id}`, { baseURL: API_URL }),
@@ -99,7 +99,7 @@ export const adminService = {
   getPayments: (params) => adminApi.get('/payments/admin', { params, baseURL: API_URL }),
 
   // Settings
-  getSettings: () => axios.get(`${API_URL}/settings`),
+  getSettings: () => adminApi.get('/settings', { baseURL: API_URL }),
   updateSettings: (data) => adminApi.put('/settings', data, { baseURL: API_URL }),
 
   // Logs
